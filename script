@@ -1,0 +1,31 @@
+#!/bin/bash
+
+clear
+echo "Bienvenidos al script para ftp"
+sleep 3s
+clear
+user=$(whoami)
+
+if [ "$user" != "root" ]; then
+        echo "No eres root, tienes que ser root para ejecutar este script"
+        exit
+fi
+
+echo "Di un usuario el cual quieres crear"
+echo ""
+read usuario
+cont=$(cat /etc/passwd | egrep ":1[0-9]{3}:" | tr ":" " " | cut -d ' ' -f1 | grep $usuario |wc -l)
+sleep 3s
+while [ $cont != 0 ]; do
+        echo "Ese usuario ya existe, di otro"
+        read usuario
+        cont=$(cat /etc/passwd | egrep ":1[0-9]{3}:" | tr ":" " " | cut -d ' ' -f1 | grep $usuario |wc -l) 
+done
+adduser $usuario --home /var/www/iesgn/$usuario
+touch /var/www/iesgn/$usuario/fichero
+chown -R $usuario:$usuario /var/www/iesgn/$usuario/*
+
+echo "FIN"
+sleep 2s
+clear
+
