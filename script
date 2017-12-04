@@ -1,31 +1,75 @@
-#!/bin/bash
+#!/usr/bin/python
+# -+- coding: utf-8 .*.
 
-clear
-echo "Bienvenidos al script para ftp"
-sleep 3s
-clear
-user=$(whoami)
+import os
+import commands
+import sys
+import getpass
 
-if [ "$user" != "root" ]; then
-        echo "No eres root, tienes que ser root para ejecutar este script"
-        exit
-fi
+uid=[]
+uid=commands.getoutput("slapcat | grep '^uid:'")
 
-echo "Di un usuario el cual quieres crear"
-echo ""
-read usuario
-cont=$(cat /etc/passwd | egrep ":1[0-9]{3}:" | tr ":" " " | cut -d ' ' -f1 | grep $usuario |wc -l)
-sleep 3s
-while [ $cont != 0 ]; do
-        echo "Ese usuario ya existe, di otro"
-        read usuario
-        cont=$(cat /etc/passwd | egrep ":1[0-9]{3}:" | tr ":" " " | cut -d ' ' -f1 | grep $usuario |wc -l) 
-done
-adduser $usuario --home /var/www/iesgn/$usuario
-touch /var/www/iesgn/$usuario/fichero
-chown -R $usuario:$usuario /var/www/iesgn/$usuario/*
+CN = raw_input('Dime nombre y apellidos: ')
+commands.getoutput("echo "+CN+" > a")
+commands.getoutput("base64 a > cn")
+cn = commands.getoutput("cat cn")
 
-echo "FIN"
-sleep 2s
-clear
+SN = raw_input('Dime el primer apellido: ')
+commands.getoutput("echo "+SN+" > b")
+commands.getoutput("base64 b > sn")
+sn = commands.getoutput("cat sn")
+
+UID = raw_input('Dime el uid: ')
+
+while UID in uid:
+	UID = raw_input( "Ese uid ya existe, di otro distinto: ")
+
+
+contra = getpass.getpass("Dime el passwd: ")
+commands.getoutput("slappasswd -s "+contra+" > ssha")
+ssha = commands.getoutput("cat ssha")
+
+
+num = int(commands.getoutput('slapcat |grep -c uidNumber')) + 2000
+
+commands.getoutput("echo 'dn: uid='"+UID+"',ou=People,dc=bascon,dc=gonzalonazareno,dc=org' > genuser.ldif")
+commands.getoutput("echo 'objectClass: top' >> genuser.ldif")
+commands.getoutput("echo 'objectClass: posixAccount' >> genuser.ldif")
+commands.getoutput("echo 'objectClass: inetOrgPerson' >> genuser.ldif")
+commands.getoutput("echo 'objectClass: person' >> genuser.ldif")
+commands.getoutput("echo 'cn:: '"+cn+" >> genuser.ldif")
+commands.getoutput("echo 'uid: '"+UID+" >> genuser.ldif")
+commands.getoutput("echo 'uidNumber: '"+str(num)+" >> genuser.ldif")
+commands.getoutput("echo 'gidNumber: 2000' >> genuser.ldif")
+commands.getoutput("echo 'homeDirectory: /home/nfs/'"+UID+" >> genuser.ldif")
+commands.getoutput("echo 'loginShell: /bin/bash' >> genuser.ldif")
+commands.getoutput("echo 'userPassword: '"+ssha+" >> genuser.ldif")
+commands.getoutput("echo 'sn:: '"+sn+" >> genuser.ldif")
+commands.getoutput("echo 'mail: '"+SN+"'@hotmail.es' >> genuser.ldif")
+commands.getoutput("echo 'givenName: '"+SN+" >> genuser.ldif")
+
+
+commands.getoutput("rm -r uid a b cn sn ssha")
+
+
+print "Enter LDAP Password:"
+commands.getoutput("ldapadd -x -D 'cn=admin,dc=bascon,dc=gonzalonazareno,dc=org' -W -f genuser.ldif ")
+
+
+commands.getoutput("sed -i'.bak' '$d' /etc/apache2/sites-available/www.conf")
+
+ultima=["Alias /"+UID+" /home/nfs/"+UID+"\n",
+		"	<Directory /home/nfs/"+UID+"/> \n",
+		"       	Options +Indexes +SymLinksIfOwnerMatch \n",
+		"       	AllowOverride None\n",
+		"       	Require all granted\n",
+		"	</Directory>\n",
+		"</VirtualHost>\n"]
+
+f=open('/etc/apache2/sites-available/www.conf','a')
+f.writelines(ultima)
+f.close()
+
+
+commands.getoutput("service apache2 restart")
 
